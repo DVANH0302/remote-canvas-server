@@ -1,3 +1,10 @@
 /libanimate
 
 FIFO_*
+*.dat
+*.mp4
+*.log
+animate_server
+animate_client
+*.o
+.vscode
