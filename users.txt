@@ -1,0 +1,4 @@
+ExcitableFabricator 100
+andy 50
+bob 0
+charlie -10
