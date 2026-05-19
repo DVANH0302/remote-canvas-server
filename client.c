@@ -17,6 +17,8 @@ void add_client(pid_t cpid, int fd_read, int fd_write) {
     clients[num_clients].logged_in = 0;
     clients[num_clients].username[0] = '\0';
     clients[num_clients].num_canvases = 0;
+    clients[num_clients].canvas_widths[0] = 0;
+    clients[num_clients].canvas_heights[0] = 0;
     clients[num_clients].num_sprites = 0;
     clients[num_clients].num_placements = 0;
     pthread_mutex_init(&clients[num_clients].order_mutex, NULL);

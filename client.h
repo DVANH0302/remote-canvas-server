@@ -18,11 +18,15 @@ struct Client {
     pthread_mutex_t order_mutex;
     pthread_cond_t order_cond;
     struct canvas *canvases[100];
+    size_t canvas_widths[100];
+    size_t canvas_heights[100];
+    
     struct sprite *sprites[100];
     struct sprite_placement *placements[100];
     int num_canvases;
     int num_sprites;
     int num_placements;
+
 };
 
 extern struct Client clients[MAX_CLIENTS];
