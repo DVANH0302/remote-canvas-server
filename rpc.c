@@ -135,7 +135,7 @@ static void rpc_destroy_sprite(struct Client *client, char *response) {
     bool result = animate_destroy_sprite(client->sprites[sp_handle - 1]);
     if (result != 0) { snprintf(response, 256, "-3\n"); return; }
     client->sprites[sp_handle - 1] = NULL;
-    snprintf(response, 256, "0\n");
+    snprintf(response, 256, "0 %d\n", result ? 1 : 0);
 }
 
 static void rpc_destroy_placement(struct Client *client, char *response) {
