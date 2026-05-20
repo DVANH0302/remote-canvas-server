@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
 
             int fd_read  = open(c2s, O_RDONLY);
             int fd_write = open(s2c, O_WRONLY);
-            printf("DEBUG: client %d fd_read=%d fd_write=%d\n", (int)cpid, fd_read, fd_write);
+            // printf("DEBUG: client %d fd_read=%d fd_write=%d\n", (int)cpid, fd_read, fd_write);
             add_client(cpid, fd_read, fd_write);
         }
     }

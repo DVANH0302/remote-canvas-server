@@ -81,11 +81,11 @@ void *run_scheduler(void *arg) {
                 } else if (n > 0) {
                     buf[n] = '\0';
 
-                    // DEBUG
-                    printf("DEBUG SCHEDULER: received from pid=%d cmd=%s",
-                        (int)clients[i].pid, buf);
-                    fflush(stdout);
-                    //
+                    // // DEBUG
+                    // printf("DEBUG SCHEDULER: received from pid=%d cmd=%s",
+                    //     (int)clients[i].pid, buf);
+                    // fflush(stdout);
+                    // //
 
                     struct Request req;
                     strncpy(req.command, buf, sizeof(req.command) - 1);

@@ -16,10 +16,10 @@ static void rpc_create_canvas(struct Client *client, char *response) {
     size_t height = (size_t)atoi(h);
     size_t width  = (size_t)atoi(w);
 
-    // DEBUG
-    printf("DEBUG canvas: width=%zu height=%zu\n", width, height);
-    fflush(stdout);
-    //
+    // // DEBUG
+    // printf("DEBUG canvas: width=%zu height=%zu\n", width, height);
+    // fflush(stdout);
+    // //
 
 
     uint32_t color = (uint32_t)strtoul(c, NULL, 10);
@@ -275,11 +275,11 @@ static void rpc_set_animation_params(struct Client *client, char *response) {
 }
 
 static void rpc_generate(struct Client *client, char *response) {
-    printf("DEBUG generate called\n");
-    fflush(stdout);
+    // printf("DEBUG generate called\n");
+    // fflush(stdout);
     char *cv_h     = strtok(NULL, " ");
-    printf("DEBUG cv_h=%s\n", cv_h ? cv_h : "NULL");
-    fflush(stdout);
+    // printf("DEBUG cv_h=%s\n", cv_h ? cv_h : "NULL");
+    // fflush(stdout);
     char *filename = strtok(NULL, " ");
     char *start_s  = strtok(NULL, " ");
     char *end_s    = strtok(NULL, " ");
@@ -332,10 +332,10 @@ static void rpc_generate(struct Client *client, char *response) {
     size_t width  = client->canvas_widths[cv_handle - 1];
     size_t height = client->canvas_heights[cv_handle - 1];
 
-    // DEBUG
-    printf("DEBUG generate: cv=%d width=%zu height=%zu\n", cv_handle, width, height);
-    fflush(stdout);
-    //
+    // // DEBUG
+    // printf("DEBUG generate: cv=%d width=%zu height=%zu\n", cv_handle, width, height);
+    // fflush(stdout);
+    // //
 
 
     // build ffmpeg command
@@ -350,10 +350,10 @@ static void rpc_generate(struct Client *client, char *response) {
         width, height, fps, dat_file, mp4_file);
 
     // run ffmpeg and capture output to log
-    printf("DEBUG ffmpeg cmd: %s\n", ffmpeg_cmd);
-    fflush(stdout);
+    // printf("DEBUG ffmpeg cmd: %s\n", ffmpeg_cmd);
+    // fflush(stdout);
     FILE *fp = popen(ffmpeg_cmd, "r");
-    printf("DEBUG fp=%p\n", (void*)fp);
+    // printf("DEBUG fp=%p\n", (void*)fp);
     fflush(stdout);
     if (fp == NULL) {
         snprintf(response, 256, "0 0 -1\n");

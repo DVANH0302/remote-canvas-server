@@ -53,10 +53,10 @@ void *worker(void *arg) {
             pthread_cond_wait(&req.client->order_cond,
                              &req.client->order_mutex);
         }
-        /// DEBUG
-        printf("DEBUG: sending to pid=%d fd_write=%d response=%s", (int)req.client->pid, req.client->fd_write, response);
-        fflush(stdout);
-        ///
+        // /// DEBUG
+        // printf("DEBUG: sending to pid=%d fd_write=%d response=%s", (int)req.client->pid, req.client->fd_write, response);
+        // fflush(stdout);
+        // ///
         write(req.client->fd_write, response, strlen(response));
         req.client->next_to_send++;
         pthread_cond_broadcast(&req.client->order_cond);
