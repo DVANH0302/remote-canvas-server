@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <animate/animate.h>
+#include "barrier.h"
 
 static void rpc_create_canvas(struct Client *client, char *response) {
     char *h = strtok(NULL, " ");
@@ -201,6 +202,8 @@ static void rpc_share_canvas(struct Client *client, char *response) {
         snprintf(response, 256, "-2\n"); return;
     }
 
+    struct canvas *cv = client->canvases[cv_handle - 1]; 
+
     // find other client by username
     struct Client *other = NULL;
     pthread_mutex_lock(&clients_mutex);
@@ -218,12 +221,25 @@ static void rpc_share_canvas(struct Client *client, char *response) {
     }
 
     // add canvas to other client's table
+    // only adds if other doesn't already have it
     pthread_mutex_lock(&clients_mutex);
-    other->canvases[other->num_canvases] = client->canvases[cv_handle - 1];
-    other->canvas_widths[other->num_canvases] = client->canvas_widths[cv_handle - 1];
-    other->canvas_heights[other->num_canvases] = client->canvas_heights[cv_handle - 1];
-    other->num_canvases++;
+    int already_has = 0;
+    for (int i = 0; i < other->num_canvases; i++) {
+        if (other->canvases[i] == cv) {
+            already_has = 1;
+            break;
+        }
+    }
+    if (!already_has) {
+        other->canvases[other->num_canvases] = cv;
+        other->canvas_widths[other->num_canvases] = client->canvas_widths[cv_handle - 1];
+        other->canvas_heights[other->num_canvases] = client->canvas_heights[cv_handle - 1];
+        other->num_canvases++;
+    }
     pthread_mutex_unlock(&clients_mutex);
+
+    // add both to barrier tracking
+    barrier_add_client(cv);
 
     snprintf(response, 256, "0\n");
 }
@@ -359,6 +375,20 @@ static void rpc_generate(struct Client *client, char *response) {
     snprintf(response, 256, "0 0 0\n");
 }
 
+
+static void rpc_barrier(struct Client *client, char *response) {
+    char *cv_h = strtok(NULL, " ");
+    if (cv_h == NULL) { snprintf(response, 256, "-2\n"); return; }
+
+    int cv_handle = atoi(cv_h);
+    if (cv_handle < 1 || cv_handle > client->num_canvases ||
+        client->canvases[cv_handle - 1] == NULL) {
+        snprintf(response, 256, "-2\n"); return;
+    }
+
+    barrier_wait(client->canvases[cv_handle - 1], response);
+}
+
 void handle_rpc(struct Client *client, char *cmd, char *response) {
     if      (strcmp(cmd, "create_canvas") == 0)        rpc_create_canvas(client, response);
     else if (strcmp(cmd, "create_rectangle") == 0)     rpc_create_rectangle(client, response);
@@ -375,6 +405,7 @@ void handle_rpc(struct Client *client, char *cmd, char *response) {
     else if (strcmp(cmd, "set_animation_params") == 0) rpc_set_animation_params(client, response);
     else if (strcmp(cmd, "generate") == 0)             rpc_generate(client, response);
     else if (strcmp(cmd, "share_canvas") == 0)         rpc_share_canvas(client, response);
+    else if (strcmp(cmd, "barrier") == 0)              rpc_barrier(client, response);
 
     else snprintf(response, 256, "-1\n");
 }

@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -g
 LDFLAGS = -lpthread -L libanimate/lib -lanimate
 
-SERVER_SRCS = animate_server.c queue.c client.c rpc.c scheduler.c worker.c
+SERVER_SRCS = animate_server.c queue.c client.c rpc.c scheduler.c worker.c barrier.c
 CLIENT_SRCS = animate_client.c
 
 default: animate_server animate_client
