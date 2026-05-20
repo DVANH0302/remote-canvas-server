@@ -7,7 +7,6 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h> 
-#include <sys/stat.h>
 extern struct RequestQueue queue;
 extern pthread_mutex_t queue_mutex;
 extern pthread_cond_t not_empty;
@@ -72,6 +71,13 @@ void *worker(void *arg) {
         if (req.client->should_disconnect) {
             sleep(1);  
             close(req.client->fd_write);
+
+            // unlink FIFOs
+            char c2s[32], s2c[32];
+            snprintf(c2s, sizeof(c2s), "FIFO_C2S_%d", req.client->pid);
+            snprintf(s2c, sizeof(s2c), "FIFO_S2C_%d", req.client->pid);
+            unlink(c2s);
+            unlink(s2c);
         }
     }
     return NULL;
