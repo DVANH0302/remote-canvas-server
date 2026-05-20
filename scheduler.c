@@ -45,6 +45,7 @@ void *run_scheduler(void *arg) {
                 int n = read(clients[i].fd_read, buf, sizeof(buf) - 1);
 
                 if (n == 0) {
+                    cleanup_client(&clients[i]);
                     close(clients[i].fd_read);
                     close(clients[i].fd_write);
                     char c2s[32], s2c[32];

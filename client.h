@@ -34,6 +34,7 @@ extern int num_clients;
 extern pthread_mutex_t clients_mutex;
 
 void add_client(pid_t cpid, int fd_read, int fd_write);
+void cleanup_client(struct Client *client);
 void handle_login(struct Client *client, char *username, char *response);
 
 #endif
