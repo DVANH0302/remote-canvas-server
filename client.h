@@ -20,6 +20,7 @@ struct Client {
     struct canvas *canvases[100];
     size_t canvas_widths[100];
     size_t canvas_heights[100];
+    int canvas_owned[100]; 
     
     struct sprite *sprites[100];
     struct sprite_placement *placements[100];

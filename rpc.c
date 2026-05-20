@@ -29,6 +29,7 @@ static void rpc_create_canvas(struct Client *client, char *response) {
     int handle = client->num_canvases + 1;
     client->canvas_widths[client->num_canvases] = width;
     client->canvas_heights[client->num_canvases] = height;
+    client->canvas_owned[client->num_canvases] = 1; 
     client->num_canvases++;
 
     snprintf(response, 256, "0 %d\n", handle);
@@ -114,6 +115,11 @@ static void rpc_destroy_canvas(struct Client *client, char *response) {
     if (cv_handle < 1 || cv_handle > client->num_canvases) {
         snprintf(response, 256, "-2\n"); return;
     }
+    if (!client->canvas_owned[cv_handle - 1]) {
+        snprintf(response, 256, "-2\n"); 
+        return;
+    }
+
     animate_destroy_canvas(client->canvases[cv_handle - 1]);
     client->canvases[cv_handle - 1] = NULL;
     snprintf(response, 256, "0\n");
@@ -234,6 +240,7 @@ static void rpc_share_canvas(struct Client *client, char *response) {
         other->canvases[other->num_canvases] = cv;
         other->canvas_widths[other->num_canvases] = client->canvas_widths[cv_handle - 1];
         other->canvas_heights[other->num_canvases] = client->canvas_heights[cv_handle - 1];
+        other->canvas_owned[other->num_canvases] = 0; 
         other->num_canvases++;
     }
     pthread_mutex_unlock(&clients_mutex);
