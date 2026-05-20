@@ -1,4 +1,4 @@
-ExcitableFabricator 100
-andy 50
-bob 0
-charlie -10
+ExcitableFabricator 1
+UnwillingDeveloper 10
+QueasyMidwife 0
+JollyPainter -10
