@@ -38,20 +38,7 @@ void sigusr1_handler(int sig, siginfo_t *info, void *context) {
     }
     new_client_pid = client_pid;
 }
-void *open_fifo_thread(void *arg) {
-    pid_t cpid = *(pid_t *)arg;
-    free(arg);
 
-    char c2s[32], s2c[32];
-    snprintf(c2s, sizeof(c2s), "FIFO_C2S_%d", cpid);
-    snprintf(s2c, sizeof(s2c), "FIFO_S2C_%d", cpid);
-
-    int fd_read  = open(c2s, O_RDWR);
-    int fd_write = open(s2c, O_RDWR);
-
-    add_client(cpid, fd_read, fd_write);
-    return NULL;
-}
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -90,12 +77,17 @@ int main(int argc, char *argv[]) {
     while (1) {
         pause();
         while (new_client_pid != 0) {
-            pid_t *cpid = malloc(sizeof(pid_t));
-            *cpid = new_client_pid;
+            pid_t cpid = new_client_pid;
             new_client_pid = 0;
-            pthread_t t;
-            pthread_create(&t, NULL, open_fifo_thread, cpid);
-            pthread_detach(t);
+
+            char c2s[32], s2c[32];
+            snprintf(c2s, sizeof(c2s), "FIFO_C2S_%d", cpid);
+            snprintf(s2c, sizeof(s2c), "FIFO_S2C_%d", cpid);
+
+            int fd_read  = open(c2s, O_RDWR);
+            int fd_write = open(s2c, O_RDWR);
+            // printf("DEBUG: client %d fd_read=%d fd_write=%d\n", (int)cpid, fd_read, fd_write);
+            add_client(cpid, fd_read, fd_write);
         }
     }
 

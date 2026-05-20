@@ -46,8 +46,8 @@ int main(int argc, char *argv[]) {
     snprintf(c2s, sizeof(c2s), "FIFO_C2S_%d", my_pid);
     snprintf(s2c, sizeof(s2c), "FIFO_S2C_%d", my_pid);
 
-    int fd_write = open(c2s, O_WRONLY);
-    int fd_read  = open(s2c, O_RDONLY);
+    int fd_write = open(c2s, O_RDWR);
+    int fd_read  = open(s2c, O_RDWR);
 
 
     char writebuf[256];
