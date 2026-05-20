@@ -46,7 +46,7 @@ void *run_scheduler(void *arg) {
         pthread_mutex_lock(&clients_mutex);
         if (num_clients == 0) {
             pthread_mutex_unlock(&clients_mutex);
-            usleep(1000);
+            usleep(10000);
             continue;
         }
         for (int i = 0; i < num_clients; i++) {
