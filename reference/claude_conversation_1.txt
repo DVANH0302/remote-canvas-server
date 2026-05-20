@@ -1,0 +1,735 @@
+Company: Anthropic
+Model: Claude Sonnet 4.6
+Date: 18/05/2026
+
+Public URL: https://claude.ai/share/1c44e1ac-8a60-41fe-8ced-98e4cc4e7855
+
+Prompt History:
+why do we need pipe, why not socket ?
+
+May 18
+Great question! Both pipes and sockets are IPC (Inter-Process Communication) mechanisms, but they serve different purposes. Here's why pipes exist and when you'd choose one over the other:
+
+Pipe vs Socket — The Core Difference
+Pipes are a simple, unidirectional byte stream between related processes. Sockets are a bidirectional, network-capable communication endpoint between any processes (or machines).
+
+Why Pipes Exist (and why they're better for certain cases)
+1. Simplicity Pipes require zero setup. A socket needs socket() → bind() → listen() → accept() → connect(). A pipe is just:
+
+c
+int fd[2];
+pipe(fd); // done
+2. Unidirectional by design For shell pipelines like ls | grep foo | wc -l, you want one-way data flow. Sockets would add unnecessary bidirectional complexity.
+
+3. Kernel-managed lifetime Pipes are automatically cleaned up when both ends close. Sockets (especially Unix domain sockets) can leave stale files on disk.
+
+4. Slightly lower overhead Pipes skip some of the socket machinery (protocol state machine, address resolution). For high-throughput local streaming, pipes can be faster.
+
+5. Implicit synchronization A pipe naturally blocks the writer when the reader is slow (backpressure), which is exactly what shell pipelines need.
+
+Why You'd Choose Sockets Instead
+Need	Use
+Two-way communication	Socket
+Unrelated processes (no shared parent)	Unix domain socket
+Network communication	TCP/UDP socket
+Multiple clients connecting	Socket (with accept())
+Named, persistent endpoint	Unix domain socket
+Request-response pattern	Socket
+The Mental Model
+Think of it this way:
+
+Pipe = a one-way tube between two processes that already know about each other (parent/child)
+Unix socket = a walkie-talkie any process can find and talk to, bidirectionally
+TCP socket = a phone line that works across machines
+When Sockets Do Replace Pipes
+In modern systems, Unix domain sockets (AF_UNIX) are often preferred over named pipes (FIFOs) because:
+
+They're bidirectional
+They support sendmsg/recvmsg with ancillary data (e.g. passing file descriptors)
+Better multi-client support
+For example, systemd, Docker, and DBus all use Unix domain sockets rather than pipes.
+
+Bottom line: Pipes exist because they're the simplest correct tool for linear, one-way data streaming — especially in shells. Sockets are more powerful but that power comes with complexity you don't always need.
+
+teach me about pipe in C
+
+May 18
+Let me walk you through pipes in C from the ground up.
+
+Here's a complete ground-up guide to pipes in C.
+
+
+
+1. The basics — pipe()
+c
+#include <unistd.h>
+
+int fd[2];
+pipe(fd);
+// fd[0] = read end
+// fd[1] = write end
+pipe() gives you two file descriptors connected by a kernel buffer. You write to fd[1], the kernel holds it, and you read it out of fd[0]. That's the entire mechanism.
+
+2. Simple pipe between parent and child
+c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main() {
+    int fd[2];
+    pipe(fd);
+
+    pid_t pid = fork();
+
+    if (pid == 0) {
+        // --- CHILD: reads from the pipe ---
+        close(fd[1]);                    // close the write end (we won't use it)
+
+        char buf[128];
+        read(fd[0], buf, sizeof(buf));   // blocks until data arrives
+        printf("Child got: %s\n", buf);
+
+        close(fd[0]);
+        exit(0);
+
+    } else {
+        // --- PARENT: writes to the pipe ---
+        close(fd[0]);                    // close the read end (we won't use it)
+
+        char *msg = "Hello from parent!";
+        write(fd[1], msg, strlen(msg) + 1);
+
+        close(fd[1]);
+        wait(NULL);                      // wait for child to finish
+    }
+
+    return 0;
+}
+The golden rule: always close the end you're not using. If the parent keeps fd[0] open, the child's read() will never see EOF — it blocks forever.
+
+3. Why close unused ends?
+
+
+A pipe has a reference count. EOF is delivered to read() only when all write ends are closed. If the parent holds fd[0] open (even though it never uses it), the child's read() blocks forever waiting for a write end that no longer exists in practice — but the kernel doesn't know that.
+
+4. Two-way communication — use two pipes
+A single pipe is one-directional. For bidirectional communication, create two:
+
+c
+int parent_to_child[2];   // parent writes → child reads
+int child_to_parent[2];   // child writes → parent reads
+
+pipe(parent_to_child);
+pipe(child_to_parent);
+
+if (fork() == 0) {
+    // Child
+    close(parent_to_child[1]);
+    close(child_to_parent[0]);
+
+    char buf[128];
+    read(parent_to_child[0], buf, sizeof(buf));   // receive question
+    write(child_to_parent[1], "42", 3);           // send answer
+
+} else {
+    // Parent
+    close(parent_to_child[0]);
+    close(child_to_parent[1]);
+
+    write(parent_to_child[1], "What is 6×7?", 13);
+
+    char buf[128];
+    read(child_to_parent[0], buf, sizeof(buf));
+    printf("Child answered: %s\n", buf);
+    wait(NULL);
+}
+5. Redirecting stdin/stdout with dup2()
+This is how shells implement ls | grep foo. The trick is to make fd[1] become stdout (file descriptor 1):
+
+c
+// In the writer process (simulating ls):
+close(fd[0]);
+dup2(fd[1], STDOUT_FILENO);   // fd[1] is now stdout
+close(fd[1]);                  // original no longer needed
+execlp("ls", "ls", NULL);     // ls writes to "stdout" → goes into pipe
+
+// In the reader process (simulating grep):
+close(fd[1]);
+dup2(fd[0], STDIN_FILENO);    // fd[0] is now stdin
+close(fd[0]);
+execlp("grep", "grep", "foo", NULL);  // grep reads from "stdin" → reads from pipe
+dup2(old, new) makes new a copy of old. After it, both point to the same underlying pipe endpoint.
+
+6. Named pipes (FIFOs)
+Anonymous pipes only work between related processes (parent/child). A FIFO is a named pipe — it lives on the filesystem so any two processes can open it:
+
+c
+#include <sys/stat.h>
+
+// Create it (once)
+mkfifo("/tmp/mypipe", 0666);
+
+// Writer process
+int fd = open("/tmp/mypipe", O_WRONLY);
+write(fd, "hello", 5);
+close(fd);
+
+// Reader process (different program entirely)
+int fd = open("/tmp/mypipe", O_RDONLY);
+char buf[64];
+read(fd, buf, sizeof(buf));
+close(fd);
+open() on a FIFO blocks until both ends are connected — the writer waits for a reader and vice versa.
+
+7. Key behaviours to remember
+Situation	What happens
+read() on empty pipe	Blocks until data arrives
+read() when all writers closed	Returns 0 (EOF)
+write() on full buffer	Blocks until reader drains it
+write() when all readers closed	Gets SIGPIPE signal, returns -1
+Writes ≤ PIPE_BUF (4096B)	Atomic — never interleaved
+Writes > PIPE_BUF	May be interleaved with other writers
+8. A complete shell-pipeline example
+c
+// Implements: ls -l | wc -l
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    int fd[2];
+    pipe(fd);
+
+    if (fork() == 0) {
+        // Child runs: ls -l  (stdout → pipe)
+        close(fd[0]);
+        dup2(fd[1], STDOUT_FILENO);
+        close(fd[1]);
+        execlp("ls", "ls", "-l", NULL);
+    }
+
+    if (fork() == 0) {
+        // Child runs: wc -l  (stdin ← pipe)
+        close(fd[1]);
+        dup2(fd[0], STDIN_FILENO);
+        close(fd[0]);
+        execlp("wc", "wc", "-l", NULL);
+    }
+
+    // Parent closes both ends and waits
+    close(fd[0]);
+    close(fd[1]);
+    wait(NULL);
+    wait(NULL);
+    return 0;
+}
+The progression to understand is: pipe() → fork() → close() unused ends → optionally dup2() to rewire stdin/stdout → exec() the real programs. That's exactly how your shell does it every time you type |. Let me know if you want to go deeper into any part — error handling, select()/poll() on pipes, or non-blocking mode are natural next steps.
+
+wait, i don't understand the code fork()  ? i do not know about process
+
+May 18
+No problem! Let's build up from scratch. Forget pipes for a moment.
+
+What is a process?
+Think of your computer as a kitchen. The CPU is the chef. A process is one complete cooking job — it has its own recipe (code), its own ingredients (memory), and its own workspace. Multiple processes run "at the same time" because the chef switches between jobs very fast.
+
+Every process has a unique PID (Process ID) — just a number the OS uses to track it.
+
+c
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    printf("My PID is: %d\n", getpid());
+    return 0;
+}
+What does fork() do?
+fork() clones the current process. You call it once, and suddenly there are two processes running — the original (parent) and a brand new copy (child). They are identical at the moment of the fork: same code, same variables, same everything.
+
+The only difference is what fork() returns:
+
+In the parent: returns the child's PID (a positive number)
+In the child: returns 0
+On error: returns -1
+That return value is how you tell which process you're in.
+
+
+
+The simplest fork() example
+c
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    pid_t pid = fork();   // <-- the universe splits here
+
+    if (pid < 0) {
+        // fork failed (rare)
+        perror("fork");
+        return 1;
+    }
+
+    if (pid == 0) {
+        // I am the CHILD
+        printf("Child: my PID=%d\n", getpid());
+    } else {
+        // I am the PARENT
+        printf("Parent: my PID=%d, child's PID=%d\n", getpid(), pid);
+    }
+
+    return 0;
+}
+Output (order may vary — both run at the same time):
+
+Parent: my PID=1001, child's PID=1002
+Child: my PID=1002
+What does the child inherit?
+At the moment of fork(), the child gets an exact snapshot of the parent:
+
+Same code
+Same variable values (copied)
+Same open file descriptors
+Same current directory
+But after the fork, they are completely separate. Changing a variable in the child does NOT change it in the parent, and vice versa. They're independent from that point on.
+
+c
+int x = 10;
+
+pid_t pid = fork();
+
+if (pid == 0) {
+    x = 999;          // child changes x
+    printf("Child x = %d\n", x);    // prints 999
+} else {
+    printf("Parent x = %d\n", x);   // still prints 10!
+}
+wait() — the parent waits for the child
+If the parent finishes before the child, the child becomes an "orphan". To prevent this, the parent calls wait(), which blocks until the child exits:
+
+c
+#include <sys/wait.h>
+
+pid_t pid = fork();
+
+if (pid == 0) {
+    printf("Child: doing work...\n");
+    sleep(2);
+    printf("Child: done!\n");
+} else {
+    printf("Parent: waiting for child...\n");
+    wait(NULL);     // blocks here until child exits
+    printf("Parent: child finished, I can continue.\n");
+}
+Now the pipe code makes sense
+c
+pipe(fd);           // create the pipe BEFORE forking
+pid_t pid = fork(); // now BOTH processes have fd[0] and fd[1]
+
+if (pid == 0) {
+    // Child: we want to READ, so close the write end
+    close(fd[1]);
+    read(fd[0], buf, sizeof(buf));
+
+} else {
+    // Parent: we want to WRITE, so close the read end
+    close(fd[0]);
+    write(fd[1], "hello", 6);
+    wait(NULL);
+}
+The reason you create the pipe before fork() is that the child inherits the parent's open file descriptors. So after the fork, both the parent and child have both ends of the pipe — and then each closes the end it doesn't need.
+
+That's the whole trick. fork() is just "make a copy of me", and the return value tells you which copy you are.
+
+wait so everything is copied only after fork() or all of the main() func
+
+May 18
+Great question. Let me clear this up precisely.
+
+Everything before fork() has already run — only once, in the parent. fork() doesn't re-run main() from the top. It clones the process at the exact moment it's called, mid-execution.
+
+Think of it like photocopying a document that's already half-written. The copy starts with everything already on it — you don't rewrite it from scratch.
+
+c
+int main() {
+    printf("A");   // runs ONCE, only in parent
+
+    int x = 10;    // runs ONCE, only in parent
+
+    fork();        // <-- clone happens HERE
+                   // child wakes up RIGHT HERE, x already = 10
+
+    printf("B");   // runs TWICE — once in parent, once in child
+}
+Output:
+
+A
+B
+B
+"A" prints once. "B" prints twice.
+
+What exactly is copied at fork()
+At the moment of fork(), the kernel takes a snapshot of the process state:
+
+All variables and their current values
+The instruction pointer (where execution is currently at)
+All open file descriptors
+The call stack
+The child wakes up pointing at the instruction right after fork(), with all that state already in place. It has no memory of main() starting — it just finds itself alive at that line.
+
+c
+int main() {
+    int x = 5;
+    x = x + 1;     // x is now 6, this already happened
+
+    fork();         // child is born with x = 6
+
+    x = x + 1;     // parent: x becomes 7
+                    // child:  x also becomes 7, independently
+}
+Both end up with x = 7, but they're separate copies — modifying one doesn't affect the other.
+
+A concrete way to think about it
+Imagine your program is a person walking down a corridor:
+
+[start of main]
+      |
+    walk...
+      |
+    walk...
+      |
+   fork()        <-- a perfect clone appears beside you, mid-corridor
+      |  \
+      |   \
+   parent  child
+   keeps   starts
+   walking walking
+   forward forward
+      |         |
+   [end]     [end]
+The clone doesn't go back to the door and walk the whole corridor again. It appears right next to you, already halfway through, and you both continue from there independently.
+
+and what is pipe ? why do we even use it
+
+May 18
+Good — let's go back to basics since you now understand processes.
+
+The problem: processes can't share memory
+Remember how after fork(), the child gets a copy of the parent's variables? That's the key word — copy. After the fork, they're completely isolated:
+
+c
+int x = 0;
+fork();
+
+if (pid == 0) {
+    x = 99;  // child sets x to 99
+}
+// parent's x is STILL 0 — it has no idea
+So if you want the child to send data back to the parent (or vice versa), you can't just use a variable. They don't share memory. You need a communication channel.
+
+That's what a pipe is.
+
+A pipe is a one-way channel between two processes
+It's like a literal tube. One process puts data in one end. The other process picks it up from the other end. The kernel holds the data in between.
+
+Parent               kernel buffer              Child
+  │                                               │
+  │  write("hello") ──────────────► read(buf)    │
+  │                                               │
+fd[1]  ◄────── pipe ──────────────────►  fd[0]
+(write end)                            (read end)
+Without a pipe, parent and child are islands. With a pipe, they have a bridge.
+
+Why not just use a global variable?
+c
+char shared[100] = "";   // surely this works?
+
+fork();
+
+if (pid == 0) {
+    strcpy(shared, "hello from child");  // child writes
+}
+
+// parent reads shared[] here...  STILL EMPTY.
+It doesn't work. The child wrote to its own copy of shared. The parent's copy was never touched. They look like the same memory but they're not — fork() gave each of them separate copies.
+
+A pipe lives in the kernel, outside both processes. Both processes have a file descriptor pointing into it, so data written by one actually reaches the other.
+
+The simplest possible pipe
+c
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+int main() {
+    int fd[2];
+    pipe(fd);         // create the channel BEFORE fork
+
+    if (fork() == 0) {
+        // Child: sends a message
+        close(fd[0]);                          // don't need read end
+        write(fd[1], "hello!", 7);
+        close(fd[1]);
+
+    } else {
+        // Parent: receives the message
+        close(fd[1]);                          // don't need write end
+        char buf[64];
+        read(fd[0], buf, sizeof(buf));         // blocks until child writes
+        printf("Parent got: %s\n", buf);
+        wait(NULL);
+    }
+}
+Output:
+
+Parent got: hello!
+The parent's read() just sits and waits until the child puts something in. That blocking behaviour is built in — you don't have to write any waiting logic yourself.
+
+So why do we use pipes?
+In one sentence: because after fork(), processes are isolated, and you need something that lives outside both of them to pass data through.
+
+That thing is the kernel buffer. A pipe is just a handle to it — one fd to write in, one fd to read out. The kernel does the rest.
+
+This is also exactly what your shell does every time you type ls | grep foo. It creates a pipe, forks twice (once for ls, once for grep), and wires ls's stdout into the write end, and grep's stdin to the read end. The pipe is the |.
+
+wait more about type what is fd[0] and fd[1] so one side is write and one side is read.
+is it like you write on one end and it populate on the other end ?
+
+May 18
+Yes, exactly! That's the perfect mental model.
+
+Think of it like a pneumatic tube at a bank drive-through:
+
+You put something in  ──────tube──────►  It comes out the other end
+     fd[1]                                      fd[0]
+  (write end)                               (read end)
+You stuff data in at fd[1]. It travels through the kernel buffer. It pops out at fd[0]. You never see the middle part — the kernel handles it.
+
+What is fd anyway?
+fd is just a normal C array of two integers:
+
+c
+int fd[2];
+Nothing special about it. You could name it anything:
+
+c
+int pipe_ends[2];
+int my_pipe[2];
+int whatever[2];
+After you call pipe(fd), the kernel fills in those two integers with file descriptor numbers — just small integers like 3, 4, 5 that the kernel uses to identify open "things" (files, pipes, sockets, etc).
+
+c
+pipe(fd);
+printf("%d %d\n", fd[0], fd[1]);
+// might print:  3  4
+fd[0] = 3 means "file descriptor number 3, which is the read end of this pipe" fd[1] = 4 means "file descriptor number 4, which is the write end of this pipe"
+
+Why [0] = read and [1] = write?
+Just a Unix convention. Think of it matching stdin/stdout:
+
+fd number 0 = stdin  (you READ from keyboard)
+fd number 1 = stdout (you WRITE to screen)
+
+pipe fd[0] = read end   ← same idea, you read from it
+pipe fd[1] = write end  ← same idea, you write to it
+0 → read. 1 → write. Same pattern everywhere in Unix.
+
+Does data actually "travel" through?
+Yes — here's what happens step by step when you do write(fd[1], "hi", 3):
+
+Step 1: you call write(fd[1], "hi", 3)
+
+        your process
+             │
+             │  "hi"
+             ▼
+     ┌───────────────┐
+     │ kernel buffer │   ← kernel stores it here (up to ~64KB)
+     └───────────────┘
+             │
+          waiting...
+
+
+Step 2: other process calls read(fd[0], buf, 64)
+
+     ┌───────────────┐
+     │ kernel buffer │
+     └───────────────┘
+             │
+             │  "hi"
+             ▼
+        other process
+        buf = "hi"  ✓
+The kernel buffer is the middle man. Your process never directly touches the other process's memory — the kernel moves the bytes for you.
+
+What happens if you read before anything is written?
+read() just blocks — it stops and waits. Your process freezes at that line until someone writes something into the pipe. This is automatic, you don't have to code any waiting logic.
+
+c
+char buf[64];
+read(fd[0], buf, 64);   // ← program STOPS HERE
+                         //   and waits...
+                         //   and waits...
+                         //   until fd[1] gets something written to it
+                         //   then instantly wakes up
+Same the other way — if the buffer is full (~64KB), write() blocks until the reader drains some of it.
+
+This blocking behaviour is actually really useful. It gives you natural synchronization between processes for free — no need for complicated timing code.
+
+so fd[0] and fd[1] are just the endpoint? we don't know the actual buffer in the middle ?
+
+May 18
+Exactly right. You never touch the buffer directly. You only ever see the two endpoints.
+
+fd[1]          ???          fd[0]
+write end   [ kernel ]    read end
+              buffer
+              
+ you only        ^          you only
+ see this        |          see this
+              you never
+              see this
+This is intentional. The kernel owns the buffer completely. You just have two "door handles" — fd[1] to push data in, fd[0] to pull data out. What happens in the middle is the kernel's problem.
+
+It's the same idea as a file
+When you do this:
+
+c
+FILE *f = fopen("hello.txt", "w");
+fprintf(f, "hello");
+fclose(f);
+You never see the actual disk, the filesystem, the sectors, the DMA transfer — none of it. You just have a handle (f) and you write to it. The OS handles everything underneath.
+
+A pipe is the same idea. fd[1] is just a handle. You call write() on it and forget about it. The kernel does the rest.
+
+This pattern has a name: abstraction
+Unix does this everywhere. Everything looks like a file descriptor — a small integer that represents "some resource the kernel is managing":
+
+fd 0  →  your keyboard      (stdin)
+fd 1  →  your screen        (stdout)
+fd 2  →  your screen        (stderr)
+fd 3  →  maybe a file
+fd 4  →  maybe a pipe end
+fd 5  →  maybe a socket
+They all look the same to you. You call read() and write() on all of them. What actually happens underneath — spinning disk, kernel buffer, network card — you don't know and don't need to know.
+
+That's the whole point. The fd is the handle. The kernel owns the thing behind it.
+
+okay then what is named pipe
+
+May 18
+Good question. Let me build up from what you already know.
+
+The problem with regular pipes
+Regular pipes only work between a parent and child. Why? Because the only way to share a pipe is through fork() — the child inherits the parent's file descriptors.
+
+Process A ──fork()──► Process B
+              │
+              └── fd[0] and fd[1] are shared because of fork
+But what if two completely unrelated processes want to talk? Processes that didn't come from the same parent?
+
+Process A          Process B
+(your app)    ?    (some other app)
+
+no fork(), no shared fds
+how do they communicate?
+A named pipe is a pipe with a name on the filesystem
+Instead of just living invisibly in the kernel, it has an actual path you can see:
+
+c
+mkfifo("/tmp/mypipe", 0666);
+Now there's a visible entry on disk:
+
+$ ls -l /tmp/mypipe
+prw-r--r-- 1 user user 0 May 18 10:00 /tmp/mypipe
+         ^
+         p means pipe
+Any process that knows that path can open it — no fork() required. They find each other through the filesystem, like two people meeting at a known address.
+
+How it works
+Two completely separate programs, no parent/child relationship:
+
+c
+// Program A (the writer)
+int fd = open("/tmp/mypipe", O_WRONLY);  // blocks until reader opens
+write(fd, "hello!", 7);
+close(fd);
+c
+// Program B (the reader)
+int fd = open("/tmp/mypipe", O_RDONLY);  // blocks until writer opens
+char buf[64];
+read(fd, buf, sizeof(buf));
+printf("got: %s\n", buf);               // got: hello!
+close(fd);
+After both open it, it behaves exactly like a regular pipe — same kernel buffer, same blocking read()/write(), same one-way data flow. The only difference is how they found each other.
+
+The key difference
+Regular pipe:   no name, shared only via fork()
+                lives entirely in the kernel
+                dies when both processes close it
+
+Named pipe:     has a filesystem path  ←  this is the only difference
+                any process can open it by name
+                the path stays on disk even after use
+The buffer in the middle is still the same invisible kernel buffer you already understand. The name is just the meeting point — once both sides have opened it, it's identical to a regular pipe underneath.
+
+A good analogy
+A regular pipe is like a private phone call between a parent and child — the number is never written down anywhere, only they have it.
+
+A named pipe is like a phone booth with an address. Anyone who knows where the booth is can use it. But once the call connects, it's the same phone call.
+
+0666 is this like the permision, 6 means read write ?
+
+May 18
+Yes exactly! You got it.
+
+0666 is a Unix permission number. The 0 at the front just tells C it's an octal (base-8) number, not decimal.
+
+Each digit represents a group of people
+  0  6  6  6
+  │  │  │  │
+  │  │  │  └── others  (everyone else)
+  │  │  └───── group   (users in the same group)
+  │  └───────── owner   (you)
+  └──────────── always 0 (octal prefix)
+Each digit is built from 3 bits
+4 = read
+2 = write
+1 = execute
+
+add them together:
+6 = 4 + 2 = read + write
+7 = 4 + 2 + 1 = read + write + execute
+5 = 4 + 1 = read + execute
+So 6 means read+write, no execute.
+
+So 0666 means
+owner  → 6 → read + write
+group  → 6 → read + write
+others → 6 → read + write
+
+everyone can read and write the pipe
+nobody can execute it (pipes aren't programs)
+You can verify this with ls -l
+$ mkfifo /tmp/mypipe
+$ ls -l /tmp/mypipe
+prw-r--r-- ...         ← default (system may apply a mask)
+
+$ mkfifo -m 0666 /tmp/mypipe
+$ ls -l /tmp/mypipe
+prw-rw-rw- ...
+│└──┘└──┘└──┘
+│ owner group others
+p = pipe
+Each rw- is exactly the digit 6 — read, write, no execute.
+
+Common permission numbers you'll see everywhere
+0777  → everyone can read, write, execute
+0755  → owner: rwx, group+others: r-x   (typical for programs)
+0644  → owner: rw-, group+others: r--   (typical for files)
+0666  → everyone: rw-                   (typical for pipes/shared files)
+0600  → owner: rw-, nobody else         (private files)
+This same permission system applies to every file, directory, socket, and pipe on Unix — not just named pipes. It's one of the most fundamental things in the whole OS.
+
+
+Use case: Explain pipe and process

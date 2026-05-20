@@ -1,0 +1,4 @@
+AI was used for:
+- Explain FIFO concept.
+- Debugging FIFO blocking issues
+- Code review and bug fixes
