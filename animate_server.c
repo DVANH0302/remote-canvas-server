@@ -75,21 +75,7 @@ int main(int argc, char *argv[]) {
     pthread_t scheduler;
     pthread_create(&scheduler, NULL, run_scheduler, NULL);
 
-    // while (1) {
-    //     pause();
-    //     while (new_client_pid != 0) {
-    //         pid_t cpid = new_client_pid;
-    //         new_client_pid = 0;
 
-    //         char c2s[32], s2c[32];
-    //         snprintf(c2s, sizeof(c2s), "FIFO_C2S_%d", cpid);
-    //         snprintf(s2c, sizeof(s2c), "FIFO_S2C_%d", cpid);
-
-    //         int fd_read  = open(c2s, O_RDWR);
-    //         int fd_write = open(s2c, O_RDWR);
-    //         add_client(cpid, fd_read, fd_write);
-    //     }
-    // }
     while (1) {
         if (new_client_pid != 0) {
             pid_t cpid = new_client_pid;
