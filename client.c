@@ -23,6 +23,7 @@ void add_client(pid_t cpid, int fd_read, int fd_write) {
     clients[num_clients].canvas_owned[0] = 0; 
     clients[num_clients].num_sprites = 0;
     clients[num_clients].num_placements = 0;
+    clients[num_clients].should_disconnect = 0;
     pthread_mutex_init(&clients[num_clients].order_mutex, NULL);
     pthread_cond_init(&clients[num_clients].order_cond, NULL);
     num_clients++;
