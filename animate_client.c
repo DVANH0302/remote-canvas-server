@@ -79,6 +79,7 @@ int main(int argc, char *argv[]) {
             char *uname = strtok(NULL, " ");
             if (uname == NULL) {
                 printf("Usage: Login <username>\n");
+                fflush(stdout);
                 continue;
             }
 
@@ -101,14 +102,17 @@ int main(int argc, char *argv[]) {
                 strncpy(username, uname, 32);
                 username[32] = '\0';
                 printf("Welcome %s. Your balance is %ld\n", username, balance);
+                fflush(stdout);
             } else {
                 // reject
                 printf("%s\n", readbuf);
+                fflush(stdout);
                 break;
             }
 
         } else if (!logged_in) {
             printf("Not logged in\n");
+            fflush(stdout);
 
         } else if (strcmp(cmd, "Disconnect") == 0) {
             // send disconnect to server
@@ -136,15 +140,20 @@ int main(int argc, char *argv[]) {
 
             if (strcmp(code, "-1") == 0) {
                 printf("RPC Failed\n");
+                fflush(stdout);
             } else if (strcmp(code, "-2") == 0) {
                 printf("Value error\n");
+                fflush(stdout);
             } else if (strcmp(code, "-3") == 0) {
                 printf("Internal error\n");
+                fflush(stdout);
             } else if (strcmp(code, "0") == 0) {
                 if (value == NULL) {
                     printf("Success\n");
+                    fflush(stdout);
                 } else {
                     printf("Success %s\n", value);
+                    fflush(stdout);
                 }
             }
         }
