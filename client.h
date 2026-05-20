@@ -21,12 +21,14 @@ struct Client {
     size_t canvas_widths[100];
     size_t canvas_heights[100];
     int canvas_owned[100]; 
-    
+
     struct sprite *sprites[100];
     struct sprite_placement *placements[100];
     int num_canvases;
     int num_sprites;
     int num_placements;
+
+    int should_disconnect;
 
 };
 

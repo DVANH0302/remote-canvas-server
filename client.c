@@ -98,6 +98,7 @@ void handle_login(struct Client *client, char *username, char *response) {
                 snprintf(response, 256, "%d\n", balance);
             } else {
                 snprintf(response, 256, "Reject BALANCE\n");
+                client->should_disconnect = 1; 
             }
             fclose(f);
             return;
@@ -105,4 +106,5 @@ void handle_login(struct Client *client, char *username, char *response) {
     }
     fclose(f);
     snprintf(response, 256, "Reject UNAUTHORISED\n");
+    client->should_disconnect = 1; 
 }

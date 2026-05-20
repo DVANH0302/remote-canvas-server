@@ -61,6 +61,11 @@ void *worker(void *arg) {
         req.client->next_to_send++;
         pthread_cond_broadcast(&req.client->order_cond);
         pthread_mutex_unlock(&req.client->order_mutex);
+
+        if (req.client->should_disconnect) {
+            sleep(1);  
+            close(req.client->fd_write);
+        }
     }
     return NULL;
 }

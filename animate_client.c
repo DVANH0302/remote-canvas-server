@@ -49,7 +49,6 @@ int main(int argc, char *argv[]) {
     int fd_write = open(c2s, O_WRONLY);
     int fd_read  = open(s2c, O_RDONLY);
 
-    printf("Connected with server!\n");
 
     char writebuf[256];
     char readbuf[256];
@@ -105,6 +104,7 @@ int main(int argc, char *argv[]) {
             } else {
                 // reject
                 printf("%s\n", readbuf);
+                break;
             }
 
         } else if (!logged_in) {
