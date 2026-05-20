@@ -84,8 +84,8 @@ int main(int argc, char *argv[]) {
             snprintf(c2s, sizeof(c2s), "FIFO_C2S_%d", cpid);
             snprintf(s2c, sizeof(s2c), "FIFO_S2C_%d", cpid);
 
-            int fd_read  = open(c2s, O_RDONLY | O_NONBLOCK);
-            int fd_write = open(s2c, O_WRONLY);
+            int fd_read  = open(c2s, O_RDWR);
+            int fd_write = open(s2c, O_RDWR);
             add_client(cpid, fd_read, fd_write);
         }
     }

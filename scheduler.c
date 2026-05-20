@@ -34,6 +34,10 @@ static void disconnect_client(int i) {
 
 void *run_scheduler(void *arg) {
     (void)arg;
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGUSR1);
+    pthread_sigmask(SIG_BLOCK, &set, NULL);
     while (1) {
         fd_set read_fds;
         FD_ZERO(&read_fds);

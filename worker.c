@@ -6,7 +6,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
-
+#include <signal.h> 
+#include <sys/stat.h>
 extern struct RequestQueue queue;
 extern pthread_mutex_t queue_mutex;
 extern pthread_cond_t not_empty;
@@ -14,6 +15,12 @@ extern pthread_cond_t not_full;
 
 void *worker(void *arg) {
     (void)arg;
+
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGUSR1);
+    pthread_sigmask(SIG_BLOCK, &set, NULL);
+
     while (1) {
         pthread_mutex_lock(&queue_mutex);
         while (isEmpty(&queue)) {
