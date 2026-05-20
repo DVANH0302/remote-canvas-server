@@ -50,6 +50,7 @@ void *worker(void *arg) {
             snprintf(response, sizeof(response), "Not logged in\n");
         } else if (strcmp(cmd, "Disconnect") == 0) {
             snprintf(response, sizeof(response), "0\n");
+            req.client->should_disconnect = 1;
         } else {
             handle_rpc(req.client, cmd, response);
         }
@@ -70,8 +71,10 @@ void *worker(void *arg) {
 
         if (req.client->should_disconnect) {
             sleep(1);  
+            cleanup_client(req.client);
             close(req.client->fd_write);
-
+            close(req.client->fd_read);
+            
             // unlink FIFOs
             char c2s[32], s2c[32];
             snprintf(c2s, sizeof(c2s), "FIFO_C2S_%d", req.client->pid);
