@@ -187,6 +187,49 @@ static void rpc_placement_bottom(struct Client *client, char *response) {
     snprintf(response, 256, "0\n");
 }
 
+static void rpc_share_canvas(struct Client *client, char *response) {
+    char *cv_h     = strtok(NULL, " ");
+    char *username = strtok(NULL, " ");
+
+    if (cv_h == NULL || username == NULL) {
+        snprintf(response, 256, "-2\n"); return;
+    }
+
+    int cv_handle = atoi(cv_h);
+    if (cv_handle < 1 || cv_handle > client->num_canvases ||
+        client->canvases[cv_handle - 1] == NULL) {
+        snprintf(response, 256, "-2\n"); return;
+    }
+
+    // find other client by username
+    struct Client *other = NULL;
+    pthread_mutex_lock(&clients_mutex);
+    for (int i = 0; i < num_clients; i++) {
+        if (clients[i].logged_in && 
+            strcmp(clients[i].username, username) == 0) {
+            other = &clients[i];
+            break;
+        }
+    }
+    pthread_mutex_unlock(&clients_mutex);
+
+    if (other == NULL) {
+        snprintf(response, 256, "-1\n"); return;
+    }
+
+    // add canvas to other client's table
+    pthread_mutex_lock(&clients_mutex);
+    other->canvases[other->num_canvases] = client->canvases[cv_handle - 1];
+    other->canvas_widths[other->num_canvases] = client->canvas_widths[cv_handle - 1];
+    other->canvas_heights[other->num_canvases] = client->canvas_heights[cv_handle - 1];
+    other->num_canvases++;
+    pthread_mutex_unlock(&clients_mutex);
+
+    snprintf(response, 256, "0\n");
+}
+
+
+
 static void rpc_set_animation_params(struct Client *client, char *response) {
     char *pl_h = strtok(NULL, " ");
     char *vx   = strtok(NULL, " ");
@@ -262,7 +305,6 @@ static void rpc_generate(struct Client *client, char *response) {
     fclose(dat);
     free(buf);
 
-    // todo: run ffmpeg
     // get canvas dimensions
     size_t width  = client->canvas_widths[cv_handle - 1];
     size_t height = client->canvas_heights[cv_handle - 1];
@@ -332,5 +374,7 @@ void handle_rpc(struct Client *client, char *cmd, char *response) {
     else if (strcmp(cmd, "placement_bottom") == 0)     rpc_placement_bottom(client, response);
     else if (strcmp(cmd, "set_animation_params") == 0) rpc_set_animation_params(client, response);
     else if (strcmp(cmd, "generate") == 0)             rpc_generate(client, response);
+    else if (strcmp(cmd, "share_canvas") == 0)         rpc_share_canvas(client, response);
+
     else snprintf(response, 256, "-1\n");
 }
