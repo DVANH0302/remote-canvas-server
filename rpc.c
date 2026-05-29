@@ -31,7 +31,7 @@ static void rpc_create_canvas(struct Client *client, char *response) {
     client->canvas_heights[client->num_canvases] = height;
     client->canvas_owned[client->num_canvases] = 1; 
     client->num_canvases++;
-
+    barrier_add_client(cv); 
     snprintf(response, 256, "0 %d\n", handle);
 }
 
@@ -242,11 +242,12 @@ static void rpc_share_canvas(struct Client *client, char *response) {
         other->canvas_heights[other->num_canvases] = client->canvas_heights[cv_handle - 1];
         other->canvas_owned[other->num_canvases] = 0; 
         other->num_canvases++;
+        // add both to barrier tracking
+        barrier_add_client(cv);
     }
     pthread_mutex_unlock(&clients_mutex);
 
-    // add both to barrier tracking
-    barrier_add_client(cv);
+
 
     snprintf(response, 256, "0\n");
 }
@@ -354,7 +355,7 @@ static void rpc_generate(struct Client *client, char *response) {
     // fflush(stdout);
     FILE *fp = popen(ffmpeg_cmd, "r");
     // printf("DEBUG fp=%p\n", (void*)fp);
-    fflush(stdout);
+    // fflush(stdout);
     if (fp == NULL) {
         snprintf(response, 256, "0 0 -1\n");
         return;
