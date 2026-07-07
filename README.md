@@ -1,6 +1,6 @@
-# Animate Server
+# Remote Canvas Server
 
-A tool for making short animations from the terminal.
+A client and server tool for making short animations from the terminal.
 
 You build a scene by typing commands: create a canvas, add shapes (rectangles, circles, or images), place them, and give them a speed so they move. When you're happy, you render the scene into an MP4 video.
 
