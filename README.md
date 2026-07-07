@@ -1,4 +1,5 @@
 # Remote Canvas Server
+![Architecture overview](architecture.png)
 
 A client and server tool for making short animations from the terminal.
 
@@ -42,7 +43,6 @@ Disconnect
 ```
 
 ## Low level architecture
-![Architecture overview](architecture.png)
 
 Here is what happens from the moment a client connects to the moment it gets a reply.
 
