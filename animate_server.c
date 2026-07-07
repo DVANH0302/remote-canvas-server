@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
             int fd_write = open(s2c, O_RDWR);
             add_client(cpid, fd_read, fd_write);
         }
-        usleep(1000);
+            usleep(1000);
     }
 
     free(threads);
